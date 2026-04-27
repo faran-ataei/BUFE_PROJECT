@@ -1,0 +1,81 @@
+.auth-container {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  min-height: 100vh;
+  background: #141e30;
+}
+
+.loginBox .login-signup {
+  background: transparent;
+  border: none;
+  cursor: pointer;
+  margin-bottom: 20px;
+  font-size: 24px;
+  display: flex;
+  gap: 10px;
+}
+
+.arrow-icon {
+  transition: transform 1.5s ease, opacity 0.5s ease;
+}
+
+.signup-login-hidden {
+  opacity: 0;
+  pointer-events: none;
+}
+
+.signup {
+  transform: translateX(30px);
+}
+
+
+.login {
+  transform: translateX(-30px);
+}
+
+
+.login-box,
+.signup-box {
+  background: #fff;
+  padding: 20px;
+  border-radius: 8px;
+  width: 300px;
+  box-shadow: 0 4px 12px rgba(0,0,0,0.1);
+  transition: transform 1.5s ease, opacity 0.5s ease;
+}
+
+
+.loginToSignup {
+  transform: translateX(100%);
+  opacity: 0;
+}
+
+.signup-login-hidden {
+  display: none;
+}
+
+.login-box input,
+.signup-box input {
+  width: 100%;
+  padding: 10px;
+  margin: 8px 0;
+  border: 1px solid #ccc;
+  border-radius: 4px;
+}
+
+.login-box button,
+.signup-box button {
+  width: 100%;
+  padding: 10px;
+  color: #fff;
+  border: none;
+  border-radius: 4px;
+  cursor: pointer;
+}
+
+.login-box button:hover,
+.signup-box button:hover {
+  background: #005fa3;
+}
