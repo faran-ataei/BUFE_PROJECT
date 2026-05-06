@@ -8,6 +8,7 @@ import {
   CardHeader,
   CardTitle,
 } from "@/components/ui/card";
+import { Link } from "react-router-dom";
 
 export function CardImage({ product }) {
   return (
@@ -23,7 +24,9 @@ export function CardImage({ product }) {
         <CardDescription>{product.description}</CardDescription>
       </CardHeader>
       <CardFooter>
-        <Button className="w-full">View Event</Button>
+        <Link to={`/product/${product._id}`} className="w-full">
+          <Button className="w-full">Detaylar</Button>
+        </Link>
       </CardFooter>
     </Card>
   );

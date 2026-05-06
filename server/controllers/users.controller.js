@@ -157,26 +157,27 @@ const loginUser = async (req, res) => {
         .json({ message: "Lütfen e-postanızı doğrulayın" });
     }
 
-    const cookieOptions = {
-      httpOnly: true,
-      secure: process.env.NODE_ENV === "production",
-      sameSite: process.env.NODE_ENV === "production" ? "none" : "lax",
-    };
+const cookieOptions = {
+  httpOnly: true,
+  secure: process.env.NODE_ENV === "production",
+  sameSite: process.env.NODE_ENV === "production" ? "none" : "lax",
+  maxAge: 1000 * 60 * 60 * 24 * 7
+};
 
-    // Set cookie
-    res.cookie("token", token, cookieOptions);
+res.cookie("token", token, cookieOptions);
+
 
     // Response
     const responseData = {
       message: "Başarıyla giriş yapıldı",
-      user: user.username,
+      user: user.name,
+      lastName: user.lastName,
       email: user.email,
     };
 
     if (user.admin) {
       responseData.admin = true;
     }
-    console.log(user);
     res.status(200).json(responseData);
   } catch (error) {
     console.error("Error logging in user:", error);

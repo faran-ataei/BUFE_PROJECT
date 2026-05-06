@@ -14,9 +14,13 @@ const helperText = {
     required: "Şifre gereklidir",
     short: "Şifre çok kısa",
   },
-  fullName: {
+  name: {
     required: "Kullanıcı adı gereklidir",
     invalid: "Geçersiz kullanıcı adı",
+  },
+  lastName: {
+    required: "Soyad gereklidir",
+    invalid: "Geçersiz soyad",
   },
 };
 
@@ -32,16 +36,16 @@ export default function Signup() {
     defaultValues: {
       email: "",
       password: "",
-      username: "",
+      name: "",
+      lastName: "",
     },
   });
 
   const onSubmit = async (value) => {
     console.log(value);
     try {
-      if (value.username) {
+      if (value.name) {
         const res = await dispatch(registerNewUser(value));
-        console.log(res.payload);
         alert(res.payload);
         reset();
       } else {
@@ -63,19 +67,32 @@ export default function Signup() {
         className={`signup-box`}
         onSubmit={handleSubmit(onSubmit)}
       >
-        <h2>Signup</h2>
+        <h2 className="text-center text-2xl font-bold">Hesap oluştur</h2>
         <input
           type="text"
-          placeholder="Full Name"
-          {...register("username", {
-            required: helperText.fullName.required,
+          placeholder="Ad"
+          {...register("name", {
+            required: helperText.name.required,
             minLength: {
               value: 3,
-              message: helperText.fullName.invalid,
+              message: helperText.name.invalid,
             },
           })}
         />
-        {errors.fullName && <p className="error">{errors.fullName.message}</p>}
+        {errors.name && <p className="error">{errors.name.message}</p>}
+
+        <input
+          type="text"
+          placeholder="Soyad"
+          {...register("lastName", {
+            required: helperText.lastName.required,
+            minLength: {
+              value: 3,
+              message: helperText.lastName.invalid,
+            },
+          })}
+        />
+        {errors.lastName && <p className="error">{errors.lastName.message}</p>}
 
         <input
           type="email"
@@ -105,9 +122,6 @@ export default function Signup() {
 
         <div className="buttons flex gap-5 mt-5">
           <button type="submit" className="bg-blue-600">Signup</button>
-          <button type="submit" className="bg-red-600">
-            <Link to="/login">Login</Link>
-          </button>
         </div>
       </form>
     </div>

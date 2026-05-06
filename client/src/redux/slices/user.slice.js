@@ -3,6 +3,7 @@ import { deleteData, postData } from "@/utils/fetchAPI";
 
 const API_URL = import.meta.env.VITE_API_URL;
 
+
 export const registerNewUser = createAsyncThunk(
   "user/register",
   async (userData, { rejectWithValue }) => {
@@ -11,7 +12,6 @@ export const registerNewUser = createAsyncThunk(
       if (!result || !result.data) {
         return rejectWithValue(result?.message || "Registration failed");
       }
-      console.log(result);
       return result.data.message;
     } catch (error) {
       return rejectWithValue(
@@ -26,13 +26,12 @@ export const loginUser = createAsyncThunk(
   async (userData, { rejectWithValue }) => {
     try {
       const result = await postData(`${API_URL}/users/login`, userData);
-      if (result.message) {
-        return rejectWithValue(result || "Login failed");
+      if (result.message && !result.data) {
+        return rejectWithValue(result.message || "Login failed");
       }
-      console.log(result);
-      return result.data;
+      return result.data; // فرض بر این است که اطلاعات کاربر در result.data است
     } catch (error) {
-      return rejectWithValue(error);
+      return rejectWithValue(error.response?.data || "Login failed");
     }
   }
 );
@@ -42,37 +41,29 @@ export const resendVerify = createAsyncThunk(
   async (userData, { rejectWithValue }) => {
     try {
       const result = await postData(`${API_URL}/users/resend/verification`, userData);
-
-      if (result.message) {
-        return rejectWithValue(result || "Something went wrong");
+      if (result.message && !result.data) {
+        return rejectWithValue(result.message || "Something went wrong");
       }
-      console.log(result);
       return result.data;
     } catch (error) {
-      return rejectWithValue(error);
+      return rejectWithValue(error.response?.data || "Error resending verification");
     }
   }
 );
 
-export const logout = createAsyncThunk("user/logout", async () => {
+export const logout = createAsyncThunk("user/logout", async (_, { rejectWithValue }) => {
   try {
     const result = await deleteData(`${API_URL}/users/logout`);
-    localStorage.removeItem("user");
     return result.data;
   } catch (error) {
-    console.error("Error logging out:", error);
+    return rejectWithValue(error.message);
   }
 });
 
-const initialValue = {
-  user: (() => {
-    try {
-      const stored = localStorage.getItem("user");
-      return stored ? JSON.parse(stored) : null;
-    } catch {
-      return null;
-    }
-  })(),
+
+const initialState = {
+  user: null,
+  lastLoginAt: null,
   isLoading: false,
   error: null,
   message: null,
@@ -80,9 +71,21 @@ const initialValue = {
 
 const userSlice = createSlice({
   name: "user",
-  initialState: initialValue,
-  reducers: {},
+  initialState,
+  reducers: {
+    clearAllUserData: (state) => {
+      state.user = null;
+      state.lastLoginAt = null;
+      state.error = null;
+      state.message = null;
+      state.isLoading = false;
+    },
+    resetError: (state) => {
+      state.error = null;
+    }
+  },
   extraReducers: (builder) => {
+    // Register
     builder.addCase(registerNewUser.pending, (state) => {
       state.isLoading = true;
       state.message = null;
@@ -95,36 +98,48 @@ const userSlice = createSlice({
       state.isLoading = false;
       state.error = action.payload;
     });
+
+    // Login
     builder.addCase(loginUser.pending, (state) => {
       state.isLoading = true;
+      state.error = null;
     });
     builder.addCase(loginUser.fulfilled, (state, action) => {
       state.isLoading = false;
-      state.token = action.payload.token;
       state.user = {
-        username:action.payload.user,
-      userEmail: action.payload.email,};
-      localStorage.setItem("user", JSON.stringify(action.payload.user));
+        name: action.payload.user,
+        lastName: action.payload.lastName,
+        email: action.payload.email,
+        admin: action.payload.admin || false,
+      };
+      // ذخیره زمان دقیق ورود به میلی‌ثانیه
+      state.lastLoginAt = new Date().getTime();
       state.error = null;
     });
     builder.addCase(loginUser.rejected, (state, action) => {
       state.isLoading = false;
       state.error = action.payload || "Login failed";
     });
+
+    // Resend Verify
     builder.addCase(resendVerify.pending, (state) => {
       state.isLoading = true;
     });
     builder.addCase(resendVerify.fulfilled, (state, action) => {
       state.isLoading = false;
-      console.log(action.payload);
-      state.message = action.payload.message;
+      state.message = action.payload?.message || "Verification email sent";
     });
     builder.addCase(resendVerify.rejected, (state, action) => {
       state.isLoading = false;
       state.error = action.payload;
     });
+
+    // Logout
     builder.addCase(logout.fulfilled, (state) => {
       state.user = null;
+      state.lastLoginAt = null;
+      state.error = null;
+      state.message = null;
     });
     builder.addCase(logout.rejected, (state, action) => {
       state.error = action.payload;
@@ -132,4 +147,5 @@ const userSlice = createSlice({
   },
 });
 
+export const { clearAllUserData, resetError } = userSlice.actions;
 export default userSlice.reducer;

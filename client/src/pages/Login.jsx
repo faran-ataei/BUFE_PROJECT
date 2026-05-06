@@ -2,7 +2,7 @@ import "./AuthSwitcher.css";
 import { useDispatch, useSelector } from "react-redux";
 import { loginUser } from "../redux/slices/user.slice";
 import { useForm } from "react-hook-form";
-import { Link, useNavigate } from "react-router-dom";
+import { useNavigate } from "react-router-dom";
 import { useEffect } from "react";
 
 const helperText = {
@@ -51,7 +51,7 @@ export default function Login() {
 
         alert(res.payload.message);
 
-        // reset();
+        reset();
       }
     } catch (error) {
       console.error("Giriş yaparken hata oluştu:", error);
@@ -61,7 +61,7 @@ export default function Login() {
   return (
     <div className="auth-container">
       <form className={`signup-box`} onSubmit={handleSubmit(onSubmit)}>
-        <h2 className="text-center text-2xl font-bold">Login</h2>
+        <h2 className="text-center text-2xl font-bold">Giriş Yap</h2>
         <input
           type="email"
           placeholder="Email"
@@ -90,9 +90,6 @@ export default function Login() {
 
         <div className="buttons flex gap-5 mt-5">
           <button type="submit" className="bg-blue-600">Login</button>
-          <button type="submit" className="bg-red-600">
-            <Link to="/authentication">Signup</Link>
-          </button>
         </div>
       </form>
     </div>
