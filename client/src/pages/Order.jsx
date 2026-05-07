@@ -57,6 +57,10 @@ export default function Orders() {
 
   const onSubmit = async (data) => {
     try {
+      if (cartItems.length === 0) {
+        alert("Sepetiniz boş. Lütfen önce ürün ekleyin.");
+        return;
+      }
       const response = await postData(`${API_URL}/orders`, {
         ...data,
         items: cartItems,

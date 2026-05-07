@@ -5,6 +5,7 @@ import bcrypt from "bcrypt";
 import jwt from "jsonwebtoken";
 import User from "../model/user.model.js";
 
+// ۱. ثبت نام کاربر
 const registerUser = async (req, res) => {
   const { password, ...restOfData } = req.body;
   try {
@@ -21,7 +22,7 @@ const registerUser = async (req, res) => {
       ...restOfData,
     });
 
-    const newVerifyEmail = await VerifyEmail({
+    const newVerifyEmail = new VerifyEmail({
       userId: newUser._id,
       token: crypto.randomBytes(32).toString("hex"),
     });
@@ -34,8 +35,7 @@ const registerUser = async (req, res) => {
     await newVerifyEmail.save();
 
     res.status(201).json({
-      message:
-        "Kullanıcı başarıyla kaydoldu. Lütfen hesabınızı doğrulamak için e-postanızı kontrol edin.",
+      message: "Kullanıcı başarıyla kaydoldu. Lütfen e-postanızı kontrol edin.",
     });
   } catch (error) {
     console.error("Error registering user:", error);
@@ -43,6 +43,7 @@ const registerUser = async (req, res) => {
   }
 };
 
+// ۲. تایید ایمیل
 const verifyUserEmail = async (req, res) => {
   try {
     const { id: userId, token } = req.params;
@@ -51,13 +52,9 @@ const verifyUserEmail = async (req, res) => {
     if (!user) {
       return res.status(404).json({ message: "Kullanıcı bulunamadı" });
     }
-    const verifyToken = await VerifyEmail.findOne({
-      userId: userId,
-    });
-    if (!token || !verifyToken) {
-      return res.status(400).json({ message: "Geçersiz doğrulama belirteci" });
-    }
-    if (token !== verifyToken.token) {
+
+    const verifyToken = await VerifyEmail.findOne({ userId });
+    if (!token || !verifyToken || token !== verifyToken.token) {
       return res.status(400).json({ message: "Geçersiz doğrulama belirteci" });
     }
 
@@ -65,33 +62,19 @@ const verifyUserEmail = async (req, res) => {
     await user.save();
     await verifyToken.deleteOne();
 
-    res
-      .status(200)
-      .send();
+    res.status(200).json({ message: "E-posta başarıyla doğrulandı" });
   } catch (error) {
     console.error("Error verifying user email:", error);
     res.status(500).json({ message: "Internal server error" });
   }
 };
 
+// ۳. ارسال مجدد ایمیل تایید
 const resendVerificationEmail = async (req, res) => {
   const { email, password } = req.body;
-
-  if (!email || !password) {
-    return res
-      .status(400)
-      .json({ message: "E-posta ve şifre gereklidir." });
-  }
-
   try {
     const user = await User.findOne({ email });
-
-    if (!user) {
-      return res.status(401).json({ message: "Geçersiz e-posta veya şifre" });
-    }
-
-    const isPasswordValid = await bcrypt.compare(password, user.password);
-    if (!isPasswordValid) {
+    if (!user || !(await bcrypt.compare(password, user.password))) {
       return res.status(401).json({ message: "Geçersiz e-posta veya şifre" });
     }
 
@@ -99,75 +82,49 @@ const resendVerificationEmail = async (req, res) => {
       return res.status(400).json({ message: "E-posta zaten doğrulandı" });
     }
 
-    // Check for existing active token
-    const existingToken = await VerifyEmail.findOne({ userId: user._id });
-    if (existingToken) {
-      return res.status(429).json({
-        message:
-          "Doğrulama e-postası zaten gönderildi. Lütfen süresi dolana kadar bekleyin.",
-      });
-    }
+    await VerifyEmail.findOneAndDelete({ userId: user._id });
 
-    // Create new token
     const token = crypto.randomBytes(32).toString("hex");
-    const newVerifyEmail = new VerifyEmail({
-      userId: user._id,
-      token,
-    });
-
+    const newVerifyEmail = new VerifyEmail({ userId: user._id, token });
     await newVerifyEmail.save();
 
-    const message = `E-postanızı doğrulamak için lütfen aşağıdaki bağlantıya tıklayın: ${process.env.BASE_URL}/api/users/verify/${user._id}/${token}`;
+    const message = `E-postanızı doğrulamak برای تایید ایمیل کلیک کنید: ${process.env.BASE_URL}/api/users/verify/${user._id}/${token}`;
     await sendEmail(user.email, "E-postanızı doğrulayın", message);
 
-    res
-      .status(200)
-      .json({ message: "Doğrulama e-postası başarıyla yeniden gönderildi." });
+    res.status(200).json({ message: "Doğrulama e-postası gönderildi." });
   } catch (error) {
-    console.error("Error resending verification email:", error);
     res.status(500).json({ message: "Internal server error" });
   }
 };
 
+// ۴. ورود کاربر (اصلاح شده برای رفع خطای ۴۰۳)
 const loginUser = async (req, res) => {
   try {
     const { email, password } = req.body;
     const user = await User.findOne({ email });
 
-    // Check if user exists
-    if (!user) {
+    if (!user || !(await bcrypt.compare(password, user.password))) {
       return res.status(401).json({ message: "Geçersiz e-posta veya şifre" });
     }
 
-    // Check if password is correct
-    const isPasswordValid = await bcrypt.compare(password, user.password);
-    if (!isPasswordValid) {
-      return res.status(401).json({ message: "Geçersiz e-posta veya şifre" });
+    if (!user.verified) {
+      return res.status(401).json({ message: "Lütfen e-postanızı doğrulayın" });
     }
 
-    // Generate JWT token
+    // زمان انقضا برای جلوگیری از خطای ۴۰۳ به ۷ روز تغییر یافت
     const token = jwt.sign({ id: user._id }, process.env.JWT_SECRET, {
-      expiresIn: "30m",
+      expiresIn: "7d",
     });
 
-    // Check if user is verified email before login
-    if (!user.verified) {
-      return res
-        .status(401)
-        .json({ message: "Lütfen e-postanızı doğrulayın" });
-    }
+    const cookieOptions = {
+      httpOnly: true,
+      secure: process.env.NODE_ENV === "production",
+      sameSite: process.env.NODE_ENV === "production" ? "none" : "lax",
+      maxAge: 7 * 24 * 60 * 60 * 1000, // ۷ روز
+    };
 
-const cookieOptions = {
-  httpOnly: true,
-  secure: process.env.NODE_ENV === "production",
-  sameSite: process.env.NODE_ENV === "production" ? "none" : "lax",
-  maxAge: 1000 * 60 * 60 * 24 * 7
-};
+    res.cookie("token", token, cookieOptions);
 
-res.cookie("token", token, cookieOptions);
-
-
-    // Response
     const responseData = {
       message: "Başarıyla giriş yapıldı",
       user: user.name,
@@ -175,35 +132,27 @@ res.cookie("token", token, cookieOptions);
       email: user.email,
     };
 
-    if (user.admin) {
-      responseData.admin = true;
-    }
+    if (user.admin) responseData.admin = true;
+
     res.status(200).json(responseData);
   } catch (error) {
-    console.error("Error logging in user:", error);
+    console.error("Login Error:", error);
     res.status(500).json({ message: "İç Sunucu Hatası" });
   }
 };
 
+// ۵. خروج کاربر
 const logoutUser = async (req, res) => {
   try {
-    const { token } = req.cookies;
-    if (!token) {
-      return res.status(401).json({ message: "Kullanıcı giriş yapmamış" });
-    }
-
     res.clearCookie("token", {
       httpOnly: true,
       secure: process.env.NODE_ENV === "production",
       sameSite: process.env.NODE_ENV === "production" ? "none" : "lax",
     });
-
-    res.status(200).json({ message: "Başarıyla çıkış yapıldı" });
+    res.status(200).json({ message: "Başarıyla çıkیش yapıldı" });
   } catch (error) {
-    console.error("Error logging out user:", error);
     res.status(500).json({ message: "İç Sunucu Hatası" });
   }
 };
-
 
 export { registerUser, verifyUserEmail, resendVerificationEmail, loginUser, logoutUser };
