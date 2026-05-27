@@ -14,6 +14,11 @@ const orderSchema = new mongoose.Schema({
       quantity: Number,
     },
   ],
+  status: { 
+    type: String, 
+    enum: ["Beklemede", "Hazırlanıyor", "Yolda", "Teslim Edildi", "İptal Edildi"], 
+    default: "Beklemede" 
+  },
   createdAt: { type: Date, default: Date.now, expires: 60 * 60 * 24 * 30 }, // 30 gün sonra otomatik silinir
 });
 

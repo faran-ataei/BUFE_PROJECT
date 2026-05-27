@@ -5,7 +5,6 @@ import bcrypt from "bcrypt";
 import jwt from "jsonwebtoken";
 import User from "../model/user.model.js";
 
-// ۱. ثبت نام کاربر
 const registerUser = async (req, res) => {
   const { password, ...restOfData } = req.body;
   try {
@@ -43,7 +42,6 @@ const registerUser = async (req, res) => {
   }
 };
 
-// ۲. تایید ایمیل
 const verifyUserEmail = async (req, res) => {
   try {
     const { id: userId, token } = req.params;
@@ -62,14 +60,13 @@ const verifyUserEmail = async (req, res) => {
     await user.save();
     await verifyToken.deleteOne();
 
-    res.status(200).json({ message: "E-posta başarıyla doğrulandı" });
+    res.redirect(`${process.env.CLIENT_URL}/email-verified?status=success`);
   } catch (error) {
     console.error("Error verifying user email:", error);
     res.status(500).json({ message: "Internal server error" });
   }
 };
 
-// ۳. ارسال مجدد ایمیل تایید
 const resendVerificationEmail = async (req, res) => {
   const { email, password } = req.body;
   try {
@@ -88,7 +85,7 @@ const resendVerificationEmail = async (req, res) => {
     const newVerifyEmail = new VerifyEmail({ userId: user._id, token });
     await newVerifyEmail.save();
 
-    const message = `E-postanızı doğrulamak برای تایید ایمیل کلیک کنید: ${process.env.BASE_URL}/api/users/verify/${user._id}/${token}`;
+    const message = `E-postanızı doğrulamak için tıklayın: ${process.env.BASE_URL}/api/users/verify/${user._id}/${token}`;
     await sendEmail(user.email, "E-postanızı doğrulayın", message);
 
     res.status(200).json({ message: "Doğrulama e-postası gönderildi." });
@@ -97,7 +94,6 @@ const resendVerificationEmail = async (req, res) => {
   }
 };
 
-// ۴. ورود کاربر (اصلاح شده برای رفع خطای ۴۰۳)
 const loginUser = async (req, res) => {
   try {
     const { email, password } = req.body;
@@ -111,7 +107,6 @@ const loginUser = async (req, res) => {
       return res.status(401).json({ message: "Lütfen e-postanızı doğrulayın" });
     }
 
-    // زمان انقضا برای جلوگیری از خطای ۴۰۳ به ۷ روز تغییر یافت
     const token = jwt.sign({ id: user._id }, process.env.JWT_SECRET, {
       expiresIn: "7d",
     });
@@ -120,7 +115,7 @@ const loginUser = async (req, res) => {
       httpOnly: true,
       secure: process.env.NODE_ENV === "production",
       sameSite: process.env.NODE_ENV === "production" ? "none" : "lax",
-      maxAge: 7 * 24 * 60 * 60 * 1000, // ۷ روز
+      maxAge: 7 * 24 * 60 * 60 * 1000,
     };
 
     res.cookie("token", token, cookieOptions);
@@ -141,7 +136,6 @@ const loginUser = async (req, res) => {
   }
 };
 
-// ۵. خروج کاربر
 const logoutUser = async (req, res) => {
   try {
     res.clearCookie("token", {
@@ -155,4 +149,95 @@ const logoutUser = async (req, res) => {
   }
 };
 
-export { registerUser, verifyUserEmail, resendVerificationEmail, loginUser, logoutUser };
+// --- Şifremi Unuttum (Forgot Password) ---
+const forgotPassword = async (req, res) => {
+  try {
+    const { email } = req.body;
+    const user = await User.findOne({ email });
+
+    if (!user) {
+      return res.status(404).json({
+        message: "Bu e-posta adresiyle kayıtlı bir kullanıcı bulunamadı.",
+      });
+    }
+
+    // 1. Rastgele bir Token oluştur
+    const resetToken = crypto.randomBytes(32).toString("hex");
+
+    // 2. Token'ı hash'le ve veritabanına kaydet (Güvenlik için)
+    const hashedToken = crypto
+      .createHash("sha256")
+      .update(resetToken)
+      .digest("hex");
+
+    user.resetPasswordToken = hashedToken;
+    user.resetPasswordExpires = Date.now() + 3600000; // 1 saat geçerli
+
+    await user.save();
+
+    // 3. Linki e-posta ile gönder
+    // Not: BASE_URL frontend adresiniz olmalı (Örn: http://localhost:5173)
+    const resetUrl = `${process.env.CLIENT_URL}/authentication/reset-password/${resetToken}`;
+
+    const message = `Şifrenizi sıfırlamak için lütfen bu bağlantıya tıklayın: ${resetUrl}\n\nNot: Bu bağlantı 1 saat içinde geçerliliğini yitirecektir.`;
+
+    await sendEmail(user.email, "Şifre Sıfırlama Talebi", message);
+
+    res.status(200).json({
+      message: "Şifre sıfırlama bağlantısı e-posta adresinize gönderildi.",
+    });
+  } catch (error) {
+    console.error("Forgot Password Error:", error);
+    res.status(500).json({ message: "İç Sunucu Hatası" });
+  }
+};
+
+// --- Yeni Şifreyi Kaydet (Reset Password) ---
+const resetPassword = async (req, res) => {
+  try {
+    const { token } = req.params;
+    const { password } = req.body;
+
+    const hashedToken = crypto.createHash("sha256").update(token).digest("hex");
+
+    const user = await User.findOne({
+      resetPasswordToken: hashedToken,
+      resetPasswordExpires: { $gt: Date.now() },
+    });
+
+    if (!user) {
+      return res
+        .status(400)
+        .json({ message: "Geçersiz veya süresi dolmuş bağlantı." });
+    }
+
+    res.clearCookie("token", {
+      httpOnly: true,
+      secure: process.env.NODE_ENV === "production",
+      sameSite: process.env.NODE_ENV === "production" ? "none" : "lax",
+    });
+
+    user.password = await bcrypt.hash(password, 10);
+
+    user.resetPasswordToken = undefined;
+    user.resetPasswordExpires = undefined;
+
+    await user.save();
+
+    res.status(200).json({
+      message:
+        "Şifreniz başarıyla güncellendi. Şimdi yeni şiferinizle giriş yapabilirsiniz.",
+    });
+  } catch (error) {
+    res.status(500).json({ message: "İç Sunucu Hatası" });
+  }
+};
+export {
+  registerUser,
+  verifyUserEmail,
+  resendVerificationEmail,
+  loginUser,
+  logoutUser,
+  forgotPassword,
+  resetPassword,
+};

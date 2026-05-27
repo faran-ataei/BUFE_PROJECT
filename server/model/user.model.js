@@ -27,7 +27,16 @@ const userSchema = new Schema({
     type: Boolean,
     default: false,
   },
-});
+  // --- Yeni eklenen alanlar (Şifre sıfırlama için) ---
+  resetPasswordToken: {
+    type: String,
+    default: undefined,
+  },
+  resetPasswordExpires: {
+    type: Date,
+    default: undefined,
+  },
+}, { timestamps: true }); // Kayıt ve güncelleme tarihlerini otomatik tutar
 
 const User = model("User", userSchema);
 export default User;

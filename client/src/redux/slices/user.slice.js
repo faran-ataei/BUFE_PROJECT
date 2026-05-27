@@ -3,6 +3,34 @@ import { deleteData, postData } from "@/utils/fetchAPI";
 
 const API_URL = import.meta.env.VITE_API_URL;
 
+// --- Thunks (Asenkron İşlemler) ---
+
+// Şifre sıfırlama bağlantısı isteği (E-posta gönderimi)
+export const forgotPassword = createAsyncThunk(
+  "user/forgotPassword",
+  async (emailData, { rejectWithValue }) => {
+    try {
+      const result = await postData(`${API_URL}/users/forgot-password`, emailData);
+      return result.data?.message || "Sıfırlama bağlantısı gönderildi.";
+    } catch (error) {
+      return rejectWithValue(error.response?.data?.message || "E-posta gönderilemedi.");
+    }
+  }
+);
+
+// Yeni şifreyi belirleme ve kaydetme
+export const resetPasswordAction = createAsyncThunk(
+  "user/resetPassword",
+  async ({ token, password }, { rejectWithValue }) => {
+    try {
+      // Token URL'den, password ise formdan gelir
+      const result = await postData(`${API_URL}/users/reset-password/${token}`, { password });
+      return result.data?.message || "Şifreniz başarıyla güncellendi.";
+    } catch (error) {
+      return rejectWithValue(error.response?.data?.message || "Şifre güncellenemedi.");
+    }
+  }
+);
 
 export const registerNewUser = createAsyncThunk(
   "user/register",
@@ -10,12 +38,12 @@ export const registerNewUser = createAsyncThunk(
     try {
       const result = await postData(`${API_URL}/users/new/user`, userData);
       if (!result || !result.data) {
-        return rejectWithValue(result?.message || "Registration failed");
+        return rejectWithValue(result?.message || "Kayıt başarısız");
       }
       return result.data.message;
     } catch (error) {
       return rejectWithValue(
-        `Error registering user: ${error.response?.data?.error || error.message}`
+        `Kayıt hatası: ${error.response?.data?.error || error.message}`
       );
     }
   }
@@ -27,11 +55,11 @@ export const loginUser = createAsyncThunk(
     try {
       const result = await postData(`${API_URL}/users/login`, userData);
       if (result.message && !result.data) {
-        return rejectWithValue(result.message || "Login failed");
+        return rejectWithValue(result.message || "Giriş başarısız");
       }
-      return result.data; // فرض بر این است که اطلاعات کاربر در result.data است
+      return result.data; 
     } catch (error) {
-      return rejectWithValue(error.response?.data || "Login failed");
+      return rejectWithValue(error.response?.data || "Giriş başarısız");
     }
   }
 );
@@ -42,11 +70,11 @@ export const resendVerify = createAsyncThunk(
     try {
       const result = await postData(`${API_URL}/users/resend/verification`, userData);
       if (result.message && !result.data) {
-        return rejectWithValue(result.message || "Something went wrong");
+        return rejectWithValue(result.message || "Bir şeyler yanlış gitti");
       }
       return result.data;
     } catch (error) {
-      return rejectWithValue(error.response?.data || "Error resending verification");
+      return rejectWithValue(error.response?.data || "Doğrulama hatası");
     }
   }
 );
@@ -60,10 +88,11 @@ export const logout = createAsyncThunk("user/logout", async (_, { rejectWithValu
   }
 });
 
+// --- Slice Ayarları ---
 
 const initialState = {
   user: null,
-  lastLoginAt: null,
+  lastLoginAt: null, 
   isLoading: false,
   error: null,
   message: null,
@@ -112,13 +141,39 @@ const userSlice = createSlice({
         email: action.payload.email,
         admin: action.payload.admin || false,
       };
-      // ذخیره زمان دقیق ورود به میلی‌ثانیه
-      state.lastLoginAt = new Date().getTime();
+      state.lastLoginAt = Date.now(); 
       state.error = null;
     });
     builder.addCase(loginUser.rejected, (state, action) => {
       state.isLoading = false;
-      state.error = action.payload || "Login failed";
+      state.error = action.payload || "Giriş başarısız";
+    });
+
+    // Forgot Password (Şifremi Unuttum)
+    builder.addCase(forgotPassword.pending, (state) => {
+      state.isLoading = true;
+    });
+    builder.addCase(forgotPassword.fulfilled, (state, action) => {
+      state.isLoading = false;
+      state.message = action.payload;
+    });
+    builder.addCase(forgotPassword.rejected, (state, action) => {
+      state.isLoading = false;
+      state.error = action.payload;
+    });
+
+    // Reset Password (Şifre Sıfırlama)
+    builder.addCase(resetPasswordAction.pending, (state) => {
+      state.isLoading = true;
+    });
+    builder.addCase(resetPasswordAction.fulfilled, (state, action) => {
+      state.isLoading = false;
+      state.message = action.payload;
+      state.error = null;
+    });
+    builder.addCase(resetPasswordAction.rejected, (state, action) => {
+      state.isLoading = false;
+      state.error = action.payload;
     });
 
     // Resend Verify
@@ -127,7 +182,7 @@ const userSlice = createSlice({
     });
     builder.addCase(resendVerify.fulfilled, (state, action) => {
       state.isLoading = false;
-      state.message = action.payload?.message || "Verification email sent";
+      state.message = action.payload?.message || "Doğrulama e-postası gönderildi";
     });
     builder.addCase(resendVerify.rejected, (state, action) => {
       state.isLoading = false;

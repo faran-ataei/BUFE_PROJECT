@@ -48,32 +48,48 @@ const createProduct = async (req, res) => {
   }
 };
 
-// update product by id
+// 🌟 ONAYLANDI: Ürün güncelleme kontrolörü (Backend)
 const updateProduct = async (req, res) => {
   try {
-    // kullanıcı bilgisi alınabilir.
+    // 1. İstekte bulunan kullanıcının admin olup olmadığını kontrol et
     const user = await User.findOne({ _id: req.user.id });
     
-    if (!user.admin) {
-      return res.status(403).json({ message: "Yetkili kullanıcı degil" });
+    if (!user || !user.admin) {
+      return res.status(403).json({ message: "Yetkili kullanıcı değilsiniz." });
     }
 
     const { name, description, price, image } = req.body;
+
+    // 2. Ürünü bul ve veritabanında güncelle
     const updatedProduct = await Product.findByIdAndUpdate(
       req.params.id,
       {
         name,
-        description,
+        description, // 🌟 Hem backend hem frontend tarafında senkronize edildi
         price,
         image,
       },
-      { new: true },
+      { 
+        new: true, // Güncellenmiş yeni veriyi geri döndürür
+        runValidators: true // Şema (Schema) kurallarını (örn: min fiyat) kontrol eder
+      }
     );
+
+    // 3. Ürün sistemde yoksa 404 hatası fırlat
     if (!updatedProduct) {
-      return res.status(404).json({ message: "Product not found" });
+      return res.status(404).json({ message: "Ürün bulunamadı." });
     }
-    res.status(200).json(updatedProduct);
+
+    // 4. Güncellenen veriyi başarılı (200) koduyla frontend'e gönder
+    // 🌟 ÖNEMLİ: EditProductModal'ın `response.data` olarak okuyabilmesi için obje yapısını netleştirdik
+    res.status(200).json({
+      success: true,
+      message: "Ürün başarıyla güncellendi.",
+      data: updatedProduct 
+    });
+
   } catch (error) {
+    console.error("Ürün güncelleme hatası:", error);
     res.status(500).json({ message: error.message });
   }
 };

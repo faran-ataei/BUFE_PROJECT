@@ -1,15 +1,14 @@
 import axios from "axios";
 
-// این خط بسیار حیاتی است و درست نوشته شده
 axios.defaults.withCredentials = true;
 
 export const getData = async (url) => {
   try {
     const response = await axios.get(url);
-    return response.data; // داده‌های موفقیت‌آمیز
+    return response.data;
   } catch (error) {
+    console.log(error);
     console.error("GET Hatası:", error.response?.data || error.message);
-    // به جای برگرداندن داده، خطا را پرتاب کنید تا در کامپوننت متوجه خطا شوید
     throw error; 
   }
 };

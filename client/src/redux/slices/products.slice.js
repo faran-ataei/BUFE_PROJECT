@@ -3,6 +3,7 @@ import { getData } from "@/utils/fetchAPI";
 
 const API_URL = import.meta.env.VITE_API_URL;
 
+// Sunucudan ürünleri çeken asenkron thunk fonksiyonu
 export const fetchProducts = createAsyncThunk(
   "products/fetch",
   async (_, { rejectWithValue }) => {
@@ -12,7 +13,7 @@ export const fetchProducts = createAsyncThunk(
     } catch (error) {
       return rejectWithValue(error);
     }
-  }
+  },
 );
 
 const productsSlice = createSlice({
@@ -22,7 +23,28 @@ const productsSlice = createSlice({
     loading: false,
     error: null,
   },
-  reducers: {},
+  // 🌟 ONAYLANDI: Senkron veri güncellemeleri için reducers alanı dolduruldu
+  reducers: {
+    // Admin ürünü güncellediğinde Redux Store'daki ürünü anında değiştiren fonksiyon
+    updateProductInStore: (state, action) => {
+      const updatedProduct = action.payload;
+      console.log("1. Redux'a Gelen Güncel Ürün:", updatedProduct);
+      console.log(
+        "2. Redux'taki Mevcut Ürünler:",
+        JSON.parse(JSON.stringify(state.products)),
+      );
+
+      state.products = state.products.map((product) =>
+        product._id === updatedProduct._id ? updatedProduct : product,
+      );
+
+      console.log(
+        "3. Güncelleme Sonrası Ürünler:",
+        JSON.parse(JSON.stringify(state.products)),
+      );
+    },
+  },
+  // Asenkron (API istekleri) durum yönetimleri
   extraReducers: (builder) => {
     builder
       .addCase(fetchProducts.pending, (state) => {
@@ -39,5 +61,8 @@ const productsSlice = createSlice({
       });
   },
 });
+
+// 🌟 ONAYLANDI: Bileşenlerde (Component) dispatch ile çağırabilmek için action fonksiyonunu dışa aktarıyoruz
+export const { updateProductInStore } = productsSlice.actions;
 
 export default productsSlice.reducer;
